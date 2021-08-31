@@ -1022,8 +1022,30 @@ class Viewer {
             let path = split_path(cmd.path);
             this.delete_path(path);
         } else if (cmd.type == "set_object") {
+            async function fetch_geometry(geom) {
+              if (geom.url) {
+                let response = await fetch(geom.url);
+                if (geom.url.toLowerCase().endsWith('stl')) {
+                  let data = await response.blob();
+                  geom.data = {buffer: await data.arrayBuffer()};
+                } else {
+                  geom.data = await response.text();
+                }
+              }
+              return geom;
+            }
+            async function fetch_geometries(geoms) {
+              let prom_geom = [];
+              for (let geom of geoms) {
+                prom_geom.push(await fetch_geometry(geom));
+              }
+              return await Promise.all(prom_geom);
+            }
             let path = split_path(cmd.path);
-            this.set_object_from_json(path, cmd.object);
+            fetch_geometries(cmd.object.geometries).then((prom_geoms) => {
+              cmd.object.geometries = prom_geoms;
+              this.set_object_from_json(path, cmd.object);
+            });
         } else if (cmd.type == "set_property") {
             let path = split_path(cmd.path);
             this.set_property(path, cmd.property, cmd.value);
